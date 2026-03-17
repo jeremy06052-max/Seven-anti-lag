@@ -16,6 +16,25 @@ local enabled = false
 local ultraEnabled = false
 local pingEnabled = false
 
+local SAVE_FILE = "SevenAntiLag_settings.txt"
+
+-- SAVE / LOAD via writefile/readfile (executor persistent storage)
+local function saveSettings()
+    local data = (enabled and "1" or "0") .. ","
+               .. (ultraEnabled and "1" or "0") .. ","
+               .. (pingEnabled and "1" or "0")
+    pcall(function() writefile(SAVE_FILE, data) end)
+end
+
+local function loadSettings()
+    local ok, data = pcall(function() return readfile(SAVE_FILE) end)
+    if not ok or not data or data == "" then
+        return false, false, false
+    end
+    local parts = data:split(",")
+    return parts[1] == "1", parts[2] == "1", parts[3] == "1"
+end
+
 -- CORE FUNCTIONS
 
 local function nukeGraphics()
@@ -290,7 +309,7 @@ local antiLagBtn = makeButton("ANTI LAG: OFF", 38)
 local ultraBtn   = makeButton("ULTRA ANTI-LAG: OFF", 83)
 local pingBtn    = makeButton("PING REDUCER: OFF", 128)
 
--- FPS & PING bar
+-- STATS BAR
 local statsBar = Instance.new("Frame")
 statsBar.Size = UDim2.new(0.88, 0, 0, 24)
 statsBar.Position = UDim2.new(0.06, 0, 0, 181)
@@ -306,7 +325,7 @@ statsStroke.Thickness = 1.5
 statsStroke.Parent = statsBar
 
 local fpsLabel = Instance.new("TextLabel")
-fpsLabel.Size = UDim2.new(0.5, 0, 1, 0)
+fpsLabel.Size = UDim2.new(0.42, 0, 1, 0)
 fpsLabel.Position = UDim2.new(0, 0, 0, 0)
 fpsLabel.BackgroundTransparency = 1
 fpsLabel.Text = "FPS: --"
@@ -316,8 +335,8 @@ fpsLabel.TextSize = 11
 fpsLabel.Parent = statsBar
 
 local pingLabel = Instance.new("TextLabel")
-pingLabel.Size = UDim2.new(0.5, 0, 1, 0)
-pingLabel.Position = UDim2.new(0.5, 0, 0, 0)
+pingLabel.Size = UDim2.new(0.42, 0, 1, 0)
+pingLabel.Position = UDim2.new(0.42, 0, 0, 0)
 pingLabel.BackgroundTransparency = 1
 pingLabel.Text = "PING: --"
 pingLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -325,7 +344,41 @@ pingLabel.Font = Enum.Font.GothamBold
 pingLabel.TextSize = 11
 pingLabel.Parent = statsBar
 
--- Update every 0.2 seconds
+-- SAVE button (tiny, right of ping)
+local saveBtn = Instance.new("TextButton")
+saveBtn.Size = UDim2.new(0.16, 0, 0.75, 0)
+saveBtn.Position = UDim2.new(0.84, 0, 0.125, 0)
+saveBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+saveBtn.Text = "💾"
+saveBtn.TextSize = 10
+saveBtn.Font = Enum.Font.GothamBold
+saveBtn.BorderSizePixel = 0
+saveBtn.Parent = statsBar
+
+Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0, 5)
+
+local saveBtnStroke = Instance.new("UIStroke")
+saveBtnStroke.Color = Color3.fromRGB(255, 255, 255)
+saveBtnStroke.Thickness = 1
+saveBtnStroke.Parent = saveBtn
+
+local savedToast = Instance.new("TextLabel")
+savedToast.Size = UDim2.new(1, 0, 0, 14)
+savedToast.Position = UDim2.new(0, 0, 1, 2)
+savedToast.BackgroundTransparency = 1
+savedToast.Text = ""
+savedToast.TextColor3 = Color3.fromRGB(255, 255, 255)
+savedToast.Font = Enum.Font.Gotham
+savedToast.TextSize = 9
+savedToast.Parent = statsBar
+
+saveBtn.MouseButton1Click:Connect(function()
+    saveSettings()
+    savedToast.Text = "✓ Saved!"
+    task.delay(1.5, function() savedToast.Text = "" end)
+end)
+
+-- FPS & Ping updater
 local lastTime = tick()
 local frameCount = 0
 
@@ -378,6 +431,26 @@ pingBtn.MouseButton1Click:Connect(function()
         pingBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     end
 end)
+
+-- AUTO-LOAD on start
+task.wait(1)
+local savedAL, savedUL, savedPR = loadSettings()
+
+if savedAL then
+    applyAntiLag()
+    antiLagBtn.Text = "ANTI LAG: ON"
+    antiLagBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+end
+if savedUL then
+    applyUltraAntiLag()
+    ultraBtn.Text = "ULTRA ANTI-LAG: ON"
+    ultraBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+end
+if savedPR then
+    applyPingReducer()
+    pingBtn.Text = "PING REDUCER: ON"
+    pingBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+end
 
 -- DRAGGING
 local dragging = false
