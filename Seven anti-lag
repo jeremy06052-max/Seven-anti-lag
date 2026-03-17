@@ -117,30 +117,19 @@ local function removeAntiLag()
     restoreSounds()
 end
 
--- ULTRA ANTI-LAG: Stop all brainrot animations
--- In Steal a Brainrot, brainrot NPCs/models are typically in workspace
--- They have Animators or AnimationControllers inside them
--- We freeze all animations on non-player models but leave them physically in place
-
 local frozenAnimators = {}
 local ultraConnection
 
 local function freezeBrainrotAnimations()
-    -- Go through all models in workspace that are NOT players
     local playerCharacters = {}
     for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character then
-            playerCharacters[p.Character] = true
-        end
+        if p.Character then playerCharacters[p.Character] = true end
     end
-
     for _, obj in ipairs(workspace:GetDescendants()) do
-        -- Target Animators inside non-player models
         if obj:IsA("Animator") then
             local model = obj:FindFirstAncestorOfClass("Model")
             if model and not playerCharacters[model] then
                 pcall(function()
-                    -- Stop all playing animation tracks
                     for _, track in ipairs(obj:GetPlayingAnimationTracks()) do
                         track:Stop(0)
                         table.insert(frozenAnimators, track)
@@ -148,8 +137,6 @@ local function freezeBrainrotAnimations()
                 end)
             end
         end
-
-        -- Also stop AnimationControllers
         if obj:IsA("AnimationController") then
             local model = obj:FindFirstAncestorOfClass("Model")
             if model and not playerCharacters[model] then
@@ -169,11 +156,9 @@ end
 local function applyUltraAntiLag()
     ultraEnabled = true
     freezeBrainrotAnimations()
-
-    -- Keep freezing new brainrots that spawn in
     ultraConnection = workspace.DescendantAdded:Connect(function(obj)
         if not ultraEnabled then return end
-        task.wait(0.1) -- let it fully load first
+        task.wait(0.1)
         if obj:IsA("Animator") then
             local playerCharacters = {}
             for _, p in ipairs(Players:GetPlayers()) do
@@ -195,8 +180,6 @@ local function removeUltraAntiLag()
     ultraEnabled = false
     if ultraConnection then ultraConnection:Disconnect() end
     frozenAnimators = {}
-    -- Note: stopped animations can't be "un-stopped" on the client
-    -- but disabling simply stops further freezing of new ones
 end
 
 -- GUI
@@ -207,109 +190,95 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer.PlayerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 225)
-frame.Position = UDim2.new(0.5, -160, 0.5, -112)
+frame.Size = UDim2.new(0, 200, 0, 145)
+frame.Position = UDim2.new(0.5, -100, 0.5, -72)
 frame.BackgroundColor3 = Color3.fromRGB(5, 0, 15)
 frame.BorderSizePixel = 0
 frame.Parent = screenGui
 
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 16)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
 local frameStroke = Instance.new("UIStroke")
-frameStroke.Color = Color3.fromRGB(140, 0, 255)
-frameStroke.Thickness = 3
+frameStroke.Color = Color3.fromRGB(255, 255, 255)
+frameStroke.Thickness = 2
 frameStroke.Parent = frame
 
 -- Floating dots
-for i = 1, 8 do
+for i = 1, 6 do
     local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(0, math.random(4, 8), 0, math.random(4, 8))
+    dot.Size = UDim2.new(0, math.random(3, 5), 0, math.random(3, 5))
     dot.Position = UDim2.new(math.random(0, 90) / 100, 0, math.random(0, 90) / 100, 0)
-    dot.BackgroundColor3 = Color3.fromRGB(180, 80, 255)
+    dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     dot.BorderSizePixel = 0
-    dot.BackgroundTransparency = 0.3
+    dot.BackgroundTransparency = 0.5
     dot.Parent = frame
     Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 end
 
 -- Title
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 45)
-title.Position = UDim2.new(0, 0, 0, 5)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 4)
 title.BackgroundTransparency = 1
 title.Text = "SEVEN ANTI LAG"
-title.TextColor3 = Color3.fromRGB(190, 100, 255)
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
-title.TextSize = 24
+title.TextSize = 15
 title.Parent = frame
 
 local titleStroke = Instance.new("UIStroke")
-titleStroke.Color = Color3.fromRGB(100, 0, 200)
-titleStroke.Thickness = 2
+titleStroke.Color = Color3.fromRGB(180, 180, 180)
+titleStroke.Thickness = 1.5
 titleStroke.Parent = title
 
 -- ANTI LAG button
 local antiLagBtn = Instance.new("TextButton")
-antiLagBtn.Size = UDim2.new(0.88, 0, 0, 55)
-antiLagBtn.Position = UDim2.new(0.06, 0, 0, 55)
-antiLagBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 180)
+antiLagBtn.Size = UDim2.new(0.88, 0, 0, 35)
+antiLagBtn.Position = UDim2.new(0.06, 0, 0, 38)
+antiLagBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 antiLagBtn.Text = "ANTI LAG: OFF"
-antiLagBtn.TextColor3 = Color3.fromRGB(200, 130, 255)
+antiLagBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 antiLagBtn.Font = Enum.Font.GothamBold
-antiLagBtn.TextSize = 20
+antiLagBtn.TextSize = 13
 antiLagBtn.BorderSizePixel = 0
 antiLagBtn.Parent = frame
 
-Instance.new("UICorner", antiLagBtn).CornerRadius = UDim.new(0, 14)
+Instance.new("UICorner", antiLagBtn).CornerRadius = UDim.new(0, 10)
 
 local alStroke = Instance.new("UIStroke")
-alStroke.Color = Color3.fromRGB(160, 50, 255)
-alStroke.Thickness = 2
+alStroke.Color = Color3.fromRGB(255, 255, 255)
+alStroke.Thickness = 1.5
 alStroke.Parent = antiLagBtn
 
-local alTextStroke = Instance.new("UIStroke")
-alTextStroke.Color = Color3.fromRGB(80, 0, 160)
-alTextStroke.Thickness = 1.5
-alTextStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-alTextStroke.Parent = antiLagBtn
-
--- ULTRA ANTI-LAG button
+-- ULTRA ANTI-LAG button (slightly smaller)
 local ultraBtn = Instance.new("TextButton")
-ultraBtn.Size = UDim2.new(0.88, 0, 0, 55)
-ultraBtn.Position = UDim2.new(0.06, 0, 0, 125)
-ultraBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 180)
+ultraBtn.Size = UDim2.new(0.78, 0, 0, 30)
+ultraBtn.Position = UDim2.new(0.11, 0, 0, 85)
+ultraBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 ultraBtn.Text = "ULTRA ANTI-LAG: OFF"
-ultraBtn.TextColor3 = Color3.fromRGB(200, 130, 255)
+ultraBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ultraBtn.Font = Enum.Font.GothamBold
-ultraBtn.TextSize = 18
+ultraBtn.TextSize = 11
 ultraBtn.BorderSizePixel = 0
 ultraBtn.Parent = frame
 
-Instance.new("UICorner", ultraBtn).CornerRadius = UDim.new(0, 14)
+Instance.new("UICorner", ultraBtn).CornerRadius = UDim.new(0, 10)
 
 local umStroke = Instance.new("UIStroke")
-umStroke.Color = Color3.fromRGB(160, 50, 255)
-umStroke.Thickness = 2
+umStroke.Color = Color3.fromRGB(255, 255, 255)
+umStroke.Thickness = 1.5
 umStroke.Parent = ultraBtn
-
-local umTextStroke = Instance.new("UIStroke")
-umTextStroke.Color = Color3.fromRGB(80, 0, 160)
-umTextStroke.Thickness = 1.5
-umTextStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-umTextStroke.Parent = ultraBtn
 
 -- Button logic
 antiLagBtn.MouseButton1Click:Connect(function()
     if not enabled then
         applyAntiLag()
         antiLagBtn.Text = "ANTI LAG: ON"
-        antiLagBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 220)
-        antiLagBtn.TextColor3 = Color3.fromRGB(230, 180, 255)
+        antiLagBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
     else
         removeAntiLag()
         antiLagBtn.Text = "ANTI LAG: OFF"
-        antiLagBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 180)
-        antiLagBtn.TextColor3 = Color3.fromRGB(200, 130, 255)
+        antiLagBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     end
 end)
 
@@ -317,13 +286,11 @@ ultraBtn.MouseButton1Click:Connect(function()
     if not ultraEnabled then
         applyUltraAntiLag()
         ultraBtn.Text = "ULTRA ANTI-LAG: ON"
-        ultraBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 220)
-        ultraBtn.TextColor3 = Color3.fromRGB(230, 180, 255)
+        ultraBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
     else
         removeUltraAntiLag()
         ultraBtn.Text = "ULTRA ANTI-LAG: OFF"
-        ultraBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 180)
-        ultraBtn.TextColor3 = Color3.fromRGB(200, 130, 255)
+        ultraBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     end
 end)
 
