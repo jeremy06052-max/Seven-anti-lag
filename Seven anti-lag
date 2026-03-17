@@ -9,6 +9,7 @@ local SoundService = game:GetService("SoundService")
 local UserGameSettings = UserSettings():GetService("UserGameSettings")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
 
 local LocalPlayer = Players.LocalPlayer
 local enabled = false
@@ -119,7 +120,6 @@ local function removeAntiLag()
     restoreSounds()
 end
 
--- ULTRA: freeze brainrot animations
 local frozenAnimators = {}
 local ultraConnection
 
@@ -185,69 +185,39 @@ local function removeUltraAntiLag()
     frozenAnimators = {}
 end
 
--- PING REDUCER
--- Lowers ping by stripping render workload so the client
--- sends/receives packets faster with less CPU interference
-
 local pingConnection
-local originalStreamDist
 
 local function applyPingReducer()
     pingEnabled = true
-
-    -- Absolute lowest graphics to free up CPU/GPU cycles for networking
     pcall(function() UserGameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1 end)
     pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
-
-    -- Cap frame rate to 30fps — reduces render load, frees CPU for network ticks
-    pcall(function() settings().Rendering.FrameRateManager = Enum.FramerateManagerMode.Off end)
-    pcall(function() shared.setFPSCap = 30 end)
-
-    -- Disable all shadows completely
     Lighting.GlobalShadows = false
-    Lighting.Technology = Enum.Technology.Compatibility
-
-    -- Set sky to nothing (removes skybox render cost)
+    pcall(function() Lighting.Technology = Enum.Technology.Compatibility end)
     for _, sky in ipairs(Lighting:GetChildren()) do
-        if sky:IsA("Sky") or sky:IsA("Atmosphere") then
-            sky:Destroy()
-        end
+        if sky:IsA("Sky") or sky:IsA("Atmosphere") then sky:Destroy() end
     end
-
-    -- Reduce all BasePart render fidelity to lowest
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") then
             pcall(function() obj.RenderFidelity = Enum.RenderFidelity.Automatic end)
             obj.CastShadow = false
         end
-        -- Kill all sounds (audio processing adds CPU load)
-        if obj:IsA("Sound") then
-            obj.Volume = 0
-        end
+        if obj:IsA("Sound") then obj.Volume = 0 end
     end
-
-    -- Keep reducing newly added parts
     pingConnection = workspace.DescendantAdded:Connect(function(obj)
         if not pingEnabled then return end
         if obj:IsA("BasePart") then
             pcall(function() obj.RenderFidelity = Enum.RenderFidelity.Automatic end)
             obj.CastShadow = false
         end
-        if obj:IsA("Sound") then
-            obj.Volume = 0
-        end
+        if obj:IsA("Sound") then obj.Volume = 0 end
     end)
-
-    print("[SevenAntiLag] Ping Reducer ON")
 end
 
 local function removePingReducer()
     pingEnabled = false
     if pingConnection then pingConnection:Disconnect() end
-    -- Restore lighting
     Lighting.GlobalShadows = true
     pcall(function() Lighting.Technology = Enum.Technology.Future end)
-    print("[SevenAntiLag] Ping Reducer OFF")
 end
 
 -- GUI
@@ -258,8 +228,8 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer.PlayerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 200, 0, 185)
-frame.Position = UDim2.new(0.5, -100, 0.5, -92)
+frame.Size = UDim2.new(0, 200, 0, 215)
+frame.Position = UDim2.new(0.5, -100, 0.5, -107)
 frame.BackgroundColor3 = Color3.fromRGB(5, 0, 15)
 frame.BorderSizePixel = 0
 frame.Parent = screenGui
@@ -271,7 +241,6 @@ frameStroke.Color = Color3.fromRGB(255, 255, 255)
 frameStroke.Thickness = 2
 frameStroke.Parent = frame
 
--- Floating dots
 for i = 1, 6 do
     local dot = Instance.new("Frame")
     dot.Size = UDim2.new(0, math.random(3, 5), 0, math.random(3, 5))
@@ -283,7 +252,6 @@ for i = 1, 6 do
     Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 end
 
--- Title
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.Position = UDim2.new(0, 0, 0, 4)
@@ -299,62 +267,80 @@ titleStroke.Color = Color3.fromRGB(180, 180, 180)
 titleStroke.Thickness = 1.5
 titleStroke.Parent = title
 
--- ANTI LAG button
-local antiLagBtn = Instance.new("TextButton")
-antiLagBtn.Size = UDim2.new(0.88, 0, 0, 35)
-antiLagBtn.Position = UDim2.new(0.06, 0, 0, 38)
-antiLagBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-antiLagBtn.Text = "ANTI LAG: OFF"
-antiLagBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-antiLagBtn.Font = Enum.Font.GothamBold
-antiLagBtn.TextSize = 13
-antiLagBtn.BorderSizePixel = 0
-antiLagBtn.Parent = frame
+local function makeButton(labelText, yPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.88, 0, 0, 35)
+    btn.Position = UDim2.new(0.06, 0, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    btn.Text = labelText
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.BorderSizePixel = 0
+    btn.Parent = frame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = 1.5
+    stroke.Parent = btn
+    return btn
+end
 
-Instance.new("UICorner", antiLagBtn).CornerRadius = UDim.new(0, 10)
+local antiLagBtn = makeButton("ANTI LAG: OFF", 38)
+local ultraBtn   = makeButton("ULTRA ANTI-LAG: OFF", 83)
+local pingBtn    = makeButton("PING REDUCER: OFF", 128)
 
-local alStroke = Instance.new("UIStroke")
-alStroke.Color = Color3.fromRGB(255, 255, 255)
-alStroke.Thickness = 1.5
-alStroke.Parent = antiLagBtn
+-- FPS & PING bar
+local statsBar = Instance.new("Frame")
+statsBar.Size = UDim2.new(0.88, 0, 0, 24)
+statsBar.Position = UDim2.new(0.06, 0, 0, 181)
+statsBar.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+statsBar.BorderSizePixel = 0
+statsBar.Parent = frame
 
--- ULTRA ANTI-LAG button
-local ultraBtn = Instance.new("TextButton")
-ultraBtn.Size = UDim2.new(0.78, 0, 0, 30)
-ultraBtn.Position = UDim2.new(0.11, 0, 0, 82)
-ultraBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-ultraBtn.Text = "ULTRA ANTI-LAG: OFF"
-ultraBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ultraBtn.Font = Enum.Font.GothamBold
-ultraBtn.TextSize = 11
-ultraBtn.BorderSizePixel = 0
-ultraBtn.Parent = frame
+Instance.new("UICorner", statsBar).CornerRadius = UDim.new(0, 8)
 
-Instance.new("UICorner", ultraBtn).CornerRadius = UDim.new(0, 10)
+local statsStroke = Instance.new("UIStroke")
+statsStroke.Color = Color3.fromRGB(255, 255, 255)
+statsStroke.Thickness = 1.5
+statsStroke.Parent = statsBar
 
-local umStroke = Instance.new("UIStroke")
-umStroke.Color = Color3.fromRGB(255, 255, 255)
-umStroke.Thickness = 1.5
-umStroke.Parent = ultraBtn
+local fpsLabel = Instance.new("TextLabel")
+fpsLabel.Size = UDim2.new(0.5, 0, 1, 0)
+fpsLabel.Position = UDim2.new(0, 0, 0, 0)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Text = "FPS: --"
+fpsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+fpsLabel.Font = Enum.Font.GothamBold
+fpsLabel.TextSize = 11
+fpsLabel.Parent = statsBar
 
--- PING REDUCER button
-local pingBtn = Instance.new("TextButton")
-pingBtn.Size = UDim2.new(0.88, 0, 0, 35)
-pingBtn.Position = UDim2.new(0.06, 0, 0, 125)
-pingBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-pingBtn.Text = "PING REDUCER: OFF"
-pingBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-pingBtn.Font = Enum.Font.GothamBold
-pingBtn.TextSize = 13
-pingBtn.BorderSizePixel = 0
-pingBtn.Parent = frame
+local pingLabel = Instance.new("TextLabel")
+pingLabel.Size = UDim2.new(0.5, 0, 1, 0)
+pingLabel.Position = UDim2.new(0.5, 0, 0, 0)
+pingLabel.BackgroundTransparency = 1
+pingLabel.Text = "PING: --"
+pingLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+pingLabel.Font = Enum.Font.GothamBold
+pingLabel.TextSize = 11
+pingLabel.Parent = statsBar
 
-Instance.new("UICorner", pingBtn).CornerRadius = UDim.new(0, 10)
+-- Update every 0.2 seconds
+local lastTime = tick()
+local frameCount = 0
 
-local pingStroke = Instance.new("UIStroke")
-pingStroke.Color = Color3.fromRGB(255, 255, 255)
-pingStroke.Thickness = 1.5
-pingStroke.Parent = pingBtn
+RunService.RenderStepped:Connect(function()
+    frameCount += 1
+    local now = tick()
+    if now - lastTime >= 0.2 then
+        local fps = math.round(frameCount / (now - lastTime))
+        frameCount = 0
+        lastTime = now
+        fpsLabel.Text = "FPS: " .. fps
+        local ping = math.round(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+        pingLabel.Text = "PING: " .. ping
+    end
+end)
 
 -- Button logic
 antiLagBtn.MouseButton1Click:Connect(function()
