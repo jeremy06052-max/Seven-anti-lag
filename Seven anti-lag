@@ -1,0 +1,365 @@
+-- ============================================
+--  SEVEN ANTI-LAG
+--  Paste into a LocalScript in StarterPlayerScripts
+-- ============================================
+
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
+local UserGameSettings = UserSettings():GetService("UserGameSettings")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local enabled = false
+local ultraEnabled = false
+
+-- CORE FUNCTIONS
+
+local function nukeGraphics()
+    pcall(function() UserGameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1 end)
+    pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 10000
+    Lighting.FogStart = 9999
+    Lighting.Brightness = 1
+    Lighting.Ambient = Color3.fromRGB(128, 128, 128)
+    Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+    for _, effect in ipairs(Lighting:GetChildren()) do
+        if effect:IsA("PostEffect") or effect:IsA("BlurEffect")
+            or effect:IsA("BloomEffect") or effect:IsA("ColorCorrectionEffect")
+            or effect:IsA("SunRaysEffect") or effect:IsA("DepthOfFieldEffect") then
+            effect:Destroy()
+        end
+    end
+end
+
+local function restoreGraphics()
+    Lighting.GlobalShadows = true
+    Lighting.FogEnd = 100000
+    Lighting.FogStart = 0
+    Lighting.Brightness = 2
+    pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end)
+end
+
+local function removeAccessories(character)
+    for _, item in ipairs(character:GetChildren()) do
+        if item:IsA("Accessory") or item:IsA("Hat")
+            or item:IsA("Shirt") or item:IsA("Pants")
+            or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
+            item:Destroy()
+        end
+    end
+    local bodyColors = Instance.new("BodyColors")
+    bodyColors.HeadColor = BrickColor.new("Medium stone grey")
+    bodyColors.TorsoColor = BrickColor.new("Medium stone grey")
+    bodyColors.LeftArmColor = BrickColor.new("Medium stone grey")
+    bodyColors.RightArmColor = BrickColor.new("Medium stone grey")
+    bodyColors.LeftLegColor = BrickColor.new("Medium stone grey")
+    bodyColors.RightLegColor = BrickColor.new("Medium stone grey")
+    bodyColors.Parent = character
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Material = Enum.Material.SmoothPlastic
+            part.CastShadow = false
+        end
+    end
+end
+
+local function nukeParticles()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ParticleEmitter") or obj:IsA("Beam")
+            or obj:IsA("Trail") or obj:IsA("Fire")
+            or obj:IsA("Smoke") or obj:IsA("Sparkles") then
+            pcall(function() obj:Destroy() end)
+        end
+    end
+end
+
+local function muteSounds()
+    SoundService.AmbientReverb = Enum.ReverbType.NoReverb
+    for _, sound in ipairs(workspace:GetDescendants()) do
+        if sound:IsA("Sound") then sound.Volume = 0 end
+    end
+end
+
+local function restoreSounds()
+    for _, sound in ipairs(workspace:GetDescendants()) do
+        if sound:IsA("Sound") then sound.Volume = 0.5 end
+    end
+end
+
+local particleConnection
+
+local function applyAntiLag()
+    enabled = true
+    nukeGraphics()
+    local character = LocalPlayer.Character
+    if character then removeAccessories(character) end
+    LocalPlayer.CharacterAdded:Connect(function(newChar)
+        if enabled then task.wait(1) removeAccessories(newChar) end
+    end)
+    nukeParticles()
+    muteSounds()
+    particleConnection = workspace.DescendantAdded:Connect(function(obj)
+        if enabled then
+            if obj:IsA("ParticleEmitter") or obj:IsA("Trail")
+                or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
+                pcall(function() obj:Destroy() end)
+            end
+        end
+    end)
+end
+
+local function removeAntiLag()
+    enabled = false
+    if particleConnection then particleConnection:Disconnect() end
+    restoreGraphics()
+    restoreSounds()
+end
+
+-- ULTRA ANTI-LAG: Stop all brainrot animations
+-- In Steal a Brainrot, brainrot NPCs/models are typically in workspace
+-- They have Animators or AnimationControllers inside them
+-- We freeze all animations on non-player models but leave them physically in place
+
+local frozenAnimators = {}
+local ultraConnection
+
+local function freezeBrainrotAnimations()
+    -- Go through all models in workspace that are NOT players
+    local playerCharacters = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then
+            playerCharacters[p.Character] = true
+        end
+    end
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        -- Target Animators inside non-player models
+        if obj:IsA("Animator") then
+            local model = obj:FindFirstAncestorOfClass("Model")
+            if model and not playerCharacters[model] then
+                pcall(function()
+                    -- Stop all playing animation tracks
+                    for _, track in ipairs(obj:GetPlayingAnimationTracks()) do
+                        track:Stop(0)
+                        table.insert(frozenAnimators, track)
+                    end
+                end)
+            end
+        end
+
+        -- Also stop AnimationControllers
+        if obj:IsA("AnimationController") then
+            local model = obj:FindFirstAncestorOfClass("Model")
+            if model and not playerCharacters[model] then
+                pcall(function()
+                    local animator = obj:FindFirstChildOfClass("Animator")
+                    if animator then
+                        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                            track:Stop(0)
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end
+
+local function applyUltraAntiLag()
+    ultraEnabled = true
+    freezeBrainrotAnimations()
+
+    -- Keep freezing new brainrots that spawn in
+    ultraConnection = workspace.DescendantAdded:Connect(function(obj)
+        if not ultraEnabled then return end
+        task.wait(0.1) -- let it fully load first
+        if obj:IsA("Animator") then
+            local playerCharacters = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Character then playerCharacters[p.Character] = true end
+            end
+            local model = obj:FindFirstAncestorOfClass("Model")
+            if model and not playerCharacters[model] then
+                pcall(function()
+                    for _, track in ipairs(obj:GetPlayingAnimationTracks()) do
+                        track:Stop(0)
+                    end
+                end)
+            end
+        end
+    end)
+end
+
+local function removeUltraAntiLag()
+    ultraEnabled = false
+    if ultraConnection then ultraConnection:Disconnect() end
+    frozenAnimators = {}
+    -- Note: stopped animations can't be "un-stopped" on the client
+    -- but disabling simply stops further freezing of new ones
+end
+
+-- GUI
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SevenAntiLag"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer.PlayerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 320, 0, 225)
+frame.Position = UDim2.new(0.5, -160, 0.5, -112)
+frame.BackgroundColor3 = Color3.fromRGB(5, 0, 15)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 16)
+
+local frameStroke = Instance.new("UIStroke")
+frameStroke.Color = Color3.fromRGB(140, 0, 255)
+frameStroke.Thickness = 3
+frameStroke.Parent = frame
+
+-- Floating dots
+for i = 1, 8 do
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, math.random(4, 8), 0, math.random(4, 8))
+    dot.Position = UDim2.new(math.random(0, 90) / 100, 0, math.random(0, 90) / 100, 0)
+    dot.BackgroundColor3 = Color3.fromRGB(180, 80, 255)
+    dot.BorderSizePixel = 0
+    dot.BackgroundTransparency = 0.3
+    dot.Parent = frame
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+end
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 45)
+title.Position = UDim2.new(0, 0, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "SEVEN ANTI LAG"
+title.TextColor3 = Color3.fromRGB(190, 100, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 24
+title.Parent = frame
+
+local titleStroke = Instance.new("UIStroke")
+titleStroke.Color = Color3.fromRGB(100, 0, 200)
+titleStroke.Thickness = 2
+titleStroke.Parent = title
+
+-- ANTI LAG button
+local antiLagBtn = Instance.new("TextButton")
+antiLagBtn.Size = UDim2.new(0.88, 0, 0, 55)
+antiLagBtn.Position = UDim2.new(0.06, 0, 0, 55)
+antiLagBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 180)
+antiLagBtn.Text = "ANTI LAG: OFF"
+antiLagBtn.TextColor3 = Color3.fromRGB(200, 130, 255)
+antiLagBtn.Font = Enum.Font.GothamBold
+antiLagBtn.TextSize = 20
+antiLagBtn.BorderSizePixel = 0
+antiLagBtn.Parent = frame
+
+Instance.new("UICorner", antiLagBtn).CornerRadius = UDim.new(0, 14)
+
+local alStroke = Instance.new("UIStroke")
+alStroke.Color = Color3.fromRGB(160, 50, 255)
+alStroke.Thickness = 2
+alStroke.Parent = antiLagBtn
+
+local alTextStroke = Instance.new("UIStroke")
+alTextStroke.Color = Color3.fromRGB(80, 0, 160)
+alTextStroke.Thickness = 1.5
+alTextStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+alTextStroke.Parent = antiLagBtn
+
+-- ULTRA ANTI-LAG button
+local ultraBtn = Instance.new("TextButton")
+ultraBtn.Size = UDim2.new(0.88, 0, 0, 55)
+ultraBtn.Position = UDim2.new(0.06, 0, 0, 125)
+ultraBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 180)
+ultraBtn.Text = "ULTRA ANTI-LAG: OFF"
+ultraBtn.TextColor3 = Color3.fromRGB(200, 130, 255)
+ultraBtn.Font = Enum.Font.GothamBold
+ultraBtn.TextSize = 18
+ultraBtn.BorderSizePixel = 0
+ultraBtn.Parent = frame
+
+Instance.new("UICorner", ultraBtn).CornerRadius = UDim.new(0, 14)
+
+local umStroke = Instance.new("UIStroke")
+umStroke.Color = Color3.fromRGB(160, 50, 255)
+umStroke.Thickness = 2
+umStroke.Parent = ultraBtn
+
+local umTextStroke = Instance.new("UIStroke")
+umTextStroke.Color = Color3.fromRGB(80, 0, 160)
+umTextStroke.Thickness = 1.5
+umTextStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+umTextStroke.Parent = ultraBtn
+
+-- Button logic
+antiLagBtn.MouseButton1Click:Connect(function()
+    if not enabled then
+        applyAntiLag()
+        antiLagBtn.Text = "ANTI LAG: ON"
+        antiLagBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 220)
+        antiLagBtn.TextColor3 = Color3.fromRGB(230, 180, 255)
+    else
+        removeAntiLag()
+        antiLagBtn.Text = "ANTI LAG: OFF"
+        antiLagBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 180)
+        antiLagBtn.TextColor3 = Color3.fromRGB(200, 130, 255)
+    end
+end)
+
+ultraBtn.MouseButton1Click:Connect(function()
+    if not ultraEnabled then
+        applyUltraAntiLag()
+        ultraBtn.Text = "ULTRA ANTI-LAG: ON"
+        ultraBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 220)
+        ultraBtn.TextColor3 = Color3.fromRGB(230, 180, 255)
+    else
+        removeUltraAntiLag()
+        ultraBtn.Text = "ULTRA ANTI-LAG: OFF"
+        ultraBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 180)
+        ultraBtn.TextColor3 = Color3.fromRGB(200, 130, 255)
+    end
+end)
+
+-- DRAGGING
+local dragging = false
+local dragInput, dragStart, startPos
+
+title.Active = true
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+title.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
